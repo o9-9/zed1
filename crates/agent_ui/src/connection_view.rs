@@ -1,8 +1,8 @@
 use acp_thread::{
     AcpThread, AcpThreadEvent, AgentSessionInfo, AgentThreadEntry, AssistantMessage,
-    AssistantMessageChunk, AuthRequired, CommandPattern, LoadError, MentionUri,
-    PermissionOptionChoice, PermissionOptions, RetryStatus, ThreadStatus, ToolCall,
-    ToolCallContent, ToolCallStatus, UserMessageId,
+    AssistantMessageChunk, AuthRequired, LoadError, MentionUri, PermissionOptionChoice,
+    PermissionOptions, PermissionPattern, RetryStatus, ThreadStatus, ToolCall, ToolCallContent,
+    ToolCallStatus, UserMessageId,
 };
 use acp_thread::{AgentConnection, Plan};
 use action_log::{ActionLog, ActionLogTelemetry};
@@ -5614,10 +5614,7 @@ pub(crate) mod tests {
         // Verify default granularity is the last option (index 2 = "Only this time")
         thread_view.read_with(cx, |thread_view, cx| {
             let state = thread_view.active_thread().unwrap();
-            let selected = state
-                .read(cx)
-                .selected_permission_granularity
-                .get(&tool_call_id);
+            let selected = state.read(cx).permission_selections.get(&tool_call_id);
             assert!(
                 selected.is_none(),
                 "Should have no selection initially (defaults to last)"
@@ -5641,11 +5638,12 @@ pub(crate) mod tests {
         // Verify the selection was updated
         thread_view.read_with(cx, |thread_view, cx| {
             let state = thread_view.active_thread().unwrap();
-            let selected = state
-                .read(cx)
-                .selected_permission_granularity
-                .get(&tool_call_id);
-            assert_eq!(selected, Some(&0), "Should have selected index 0");
+            let selected = state.read(cx).permission_selections.get(&tool_call_id);
+            assert_eq!(
+                selected.and_then(|s| s.choice_index()),
+                Some(0),
+                "Should have selected index 0"
+            );
         });
     }
 

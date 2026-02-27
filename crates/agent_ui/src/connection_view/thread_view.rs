@@ -192,12 +192,12 @@ impl DiffStats {
 /// Default (no entry in the map) means the last dropdown choice is selected,
 /// which is typically "Only this time".
 #[derive(Clone)]
-enum PermissionSelection {
+pub(crate) enum PermissionSelection {
     /// A specific choice from the dropdown (e.g., "Always for terminal", "Only this time").
     /// The index corresponds to the position in the `choices` list from `PermissionOptions`.
     Choice(usize),
     /// "Select options…" mode where individual command patterns can be toggled.
-    /// Contains the indices of checked patterns in the `command_patterns` list.
+    /// Contains the indices of checked patterns in the `patterns` list.
     /// All patterns start checked when this mode is first activated.
     SelectedPatterns(Vec<usize>),
 }
@@ -205,7 +205,7 @@ enum PermissionSelection {
 impl PermissionSelection {
     /// Returns the choice index if a specific dropdown choice is selected,
     /// or `None` if in per-command pattern mode.
-    fn choice_index(&self) -> Option<usize> {
+    pub(crate) fn choice_index(&self) -> Option<usize> {
         match self {
             Self::Choice(index) => Some(*index),
             Self::SelectedPatterns(_) => None,
@@ -284,7 +284,8 @@ pub struct ThreadView {
     pub is_loading_contents: bool,
     pub new_server_version_available: Option<SharedString>,
     pub resumed_without_history: bool,
-    permission_selections: HashMap<agent_client_protocol::ToolCallId, PermissionSelection>,
+    pub(crate) permission_selections:
+        HashMap<agent_client_protocol::ToolCallId, PermissionSelection>,
     pub resume_thread_metadata: Option<AgentSessionInfo>,
     pub _cancel_task: Option<Task<()>>,
     pub skip_queue_processing_count: usize,
@@ -1474,11 +1475,11 @@ impl ThreadView {
                                     &call.status
                                 {
                                     if let PermissionOptions::DropdownWithPatterns {
-                                        command_patterns,
+                                        patterns,
                                         ..
                                     } = options
                                     {
-                                        return Some(command_patterns.len());
+                                        return Some(patterns.len());
                                     }
                                 }
                             }
@@ -1520,11 +1521,11 @@ impl ThreadView {
             PermissionOptions::Dropdown(choices) => (choices.as_slice(), None),
             PermissionOptions::DropdownWithPatterns {
                 choices,
-                command_patterns,
+                patterns,
                 tool_name,
             } => (
                 choices.as_slice(),
-                Some((command_patterns.as_slice(), tool_name.as_str())),
+                Some((patterns.as_slice(), tool_name.as_str())),
             ),
             _ => {
                 let kind = if is_allow {
@@ -1540,9 +1541,9 @@ impl ThreadView {
 
         // When in per-command pattern mode, use the checked patterns.
         if let Some(PermissionSelection::SelectedPatterns(checked)) = selection
-            && let Some((command_patterns, tool_name)) = dropdown_with_patterns
+            && let Some((patterns, tool_name)) = dropdown_with_patterns
         {
-            let checked_patterns: Vec<&str> = command_patterns
+            let checked_patterns: Vec<&str> = patterns
                 .iter()
                 .enumerate()
                 .filter(|(index, _)| checked.contains(index))
@@ -5646,13 +5647,12 @@ impl ThreadView {
             ),
             PermissionOptions::DropdownWithPatterns {
                 choices,
-                command_patterns,
+                patterns,
                 tool_name,
             } => self.render_permission_buttons_with_patterns(
-                session_id,
                 is_first,
                 choices,
-                command_patterns,
+                patterns,
                 tool_name,
                 entry_ix,
                 tool_call_id,
@@ -5865,10 +5865,9 @@ impl ThreadView {
 
     fn render_permission_buttons_with_patterns(
         &self,
-        _session_id: acp::SessionId,
         is_first: bool,
         choices: &[PermissionOptionChoice],
-        command_patterns: &[CommandPattern],
+        patterns: &[PermissionPattern],
         tool_name: &str,
         entry_ix: usize,
         tool_call_id: acp::ToolCallId,
@@ -5950,7 +5949,7 @@ impl ThreadView {
             )
             .child(self.render_permission_granularity_dropdown_with_patterns(
                 choices,
-                command_patterns,
+                patterns,
                 tool_name,
                 dropdown_label,
                 entry_ix,
@@ -5963,7 +5962,7 @@ impl ThreadView {
     fn render_permission_granularity_dropdown_with_patterns(
         &self,
         choices: &[PermissionOptionChoice],
-        command_patterns: &[CommandPattern],
+        patterns: &[PermissionPattern],
         _tool_name: &str,
         current_label: SharedString,
         entry_ix: usize,
@@ -5978,7 +5977,7 @@ impl ThreadView {
             .map(|(i, choice)| (i, choice.label()))
             .collect();
 
-        let pattern_options: Vec<(usize, SharedString)> = command_patterns
+        let pattern_options: Vec<(usize, SharedString)> = patterns
             .iter()
             .enumerate()
             .map(|(i, cp)| {
@@ -5989,7 +5988,7 @@ impl ThreadView {
             })
             .collect();
 
-        let pattern_count = command_patterns.len();
+        let pattern_count = patterns.len();
         let permission_dropdown_handle = self.permission_dropdown_handle.clone();
         let view = cx.entity().downgrade();
 
