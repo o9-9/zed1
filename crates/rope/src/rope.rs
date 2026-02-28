@@ -553,7 +553,7 @@ impl Rope {
             return false;
         }
         let mut remaining = pattern;
-        for chunk in self.chunks_in_range(0..pattern.len()) {
+        for chunk in self.chunks_in_range(0..self.len()) {
             if remaining.starts_with(chunk) {
                 remaining = &remaining[chunk.len()..];
                 if remaining.is_empty() {
@@ -567,12 +567,11 @@ impl Rope {
     }
 
     pub fn ends_with(&self, pattern: &str) -> bool {
-        let len = self.len();
-        if pattern.len() > len {
+        if pattern.len() > self.len() {
             return false;
         }
         let mut remaining = pattern;
-        for chunk in self.reversed_chunks_in_range(len - pattern.len()..len) {
+        for chunk in self.reversed_chunks_in_range(0..self.len()) {
             if remaining.ends_with(chunk) {
                 remaining = &remaining[..remaining.len() - chunk.len()];
                 if remaining.is_empty() {
